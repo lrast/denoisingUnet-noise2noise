@@ -1,23 +1,14 @@
 import torch
+import loadData
+
 import torch.nn as nn
 import pytorch_lightning as pl
 
 from torch.nn.functional import max_pool2d
 
 
-def convBank(inChannels, outChannels, midChannels=None):
-    if midChannels is None:
-        midChannels = outChannels
-
-    return nn.Sequential(
-            nn.Conv2d(inChannels, midChannels, (3,3), padding='same'), #32
-            nn.ReLU(),
-            nn.Conv2d(midChannels, outChannels, (3,3), padding='same'), #32
-        )
-
-
 class UNet(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, **hyperparameters):
         super(UNet, self).__init__()
 
         # initialize the banks of convolutional filters
@@ -40,9 +31,17 @@ class UNet(pl.LightningModule):
         self.toOut = nn.Conv2d(6,3, (1,1), padding='same')
 
         # initializer hyperparameters
-        self.hyperParameters = {
-            'lr': 1e-3
+        self.hyperparameters = {
+            'lr': 1e-3,
+            'batch_size': 10,
+
+            'Nimages': 10,
+            'Mnoisy': 10,
+            'noise_rate': 0.1,
+            'noise_model': loadData.shotRandomNoise
         }
+        self.hyperparameters.update( hyperparameters )
+
         self.pixelLoss = nn.MSELoss()
 
 
@@ -65,10 +64,27 @@ class UNet(pl.LightningModule):
 
         return self.pixelLoss(targets, reconstruction)
 
-
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hyperParameters['lr'])
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hyperparameters['lr'])
         return optimizer
 
+    # data
+    def setup( self, stage=None):
+        self.trainData = loadData.ImageToImageDataset(**self.hyperparameters)
 
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.trainData, batch_size=self.hyperparameters['batch_size'])
+
+
+
+
+def convBank(inChannels, outChannels, midChannels=None):
+    if midChannels is None:
+        midChannels = outChannels
+
+    return nn.Sequential(
+            nn.Conv2d(inChannels, midChannels, (3,3), padding='same'), #32
+            nn.ReLU(),
+            nn.Conv2d(midChannels, outChannels, (3,3), padding='same'), #32
+        )
 

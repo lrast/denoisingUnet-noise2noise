@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 
 class ImageToImageDataset(Dataset):
-    def __init__(self, Nimages, Mnoisy, makeNoise=None):
+    def __init__(self, Nimages, Mnoisy, noise_model, noise_rate, **_):
         super(ImageToImageDataset, self).__init__()
 
         CIFAR10_data = torchvision.datasets.CIFAR10('./CIFAR10', train=True, download=False, 
@@ -25,7 +25,7 @@ class ImageToImageDataset(Dataset):
 
             for i in range(Mnoisy):
                 self.inputs.append( image )
-                self.targets.append( shotRandomNoise(0.1, image) )
+                self.targets.append( noise_model(noise_rate, image) )
 
     def __len__(self):
         return len(self.inputs)
