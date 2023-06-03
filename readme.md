@@ -4,3 +4,6 @@ This is a reproduction of, and follow-up on, [Lehtinen et al. (2018) Noise2Noise
 
 The paper reported superior results in some cases with this paired noise approach compared to learning on the mean image, or even the ground truth image. It is this result that I would like to dig into and understand more depth.
 
+
+
+
