@@ -7,7 +7,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 
 
-class ImageToImageDataset(Dataset):
+class GroundTruthDataset(Dataset):
     def __init__(self, Nimages, Mnoisy, noise_model, noise_rate, **_):
         super(ImageToImageDataset, self).__init__()
 
@@ -24,8 +24,8 @@ class ImageToImageDataset(Dataset):
             image, label = CIFAR10_data.__getitem__(index)
 
             for i in range(Mnoisy):
-                self.inputs.append( image )
-                self.targets.append( noise_model(noise_rate, image) )
+                self.inputs.append( noise_model(noise_rate, image) )
+                self.targets.append( image )
 
     def __len__(self):
         return len(self.inputs)

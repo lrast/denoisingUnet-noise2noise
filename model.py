@@ -34,6 +34,7 @@ class UNet(pl.LightningModule):
         self.hyperparameters = {
             'lr': 1e-3,
             'batch_size': 10,
+            'max_epochs': 1000,
 
             'Nimages': 10,
             'Mnoisy': 10,
@@ -73,7 +74,8 @@ class UNet(pl.LightningModule):
         self.trainData = loadData.ImageToImageDataset(**self.hyperparameters)
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.trainData, batch_size=self.hyperparameters['batch_size'])
+        return torch.utils.data.DataLoader(self.trainData, batch_size=self.hyperparameters['batch_size'],
+            shuffle=True)
 
 
 

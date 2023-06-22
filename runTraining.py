@@ -5,5 +5,5 @@ from model import UNet
 from loadData import ImageToImageDataset, shotRandomNoise
 
 model = UNet()
-trainer = pl.Trainer()
+trainer = pl.Trainer(max_epochs=model.hyperparameters['max_epochs'])
 
