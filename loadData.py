@@ -47,8 +47,8 @@ class GroundTruthDataset(Dataset):
     """ Dataset of corrupted images and their corresponding ground truth """
     def __init__(self, baseImages, noisyImages):
         super(GroundTruthDataset, self).__init__()
-        self.noiseFreeImages = baseData
-        self.noisyImages = noisyData
+        self.noiseFreeImages = baseImages
+        self.noisyImages = noisyImages
 
     def __len__(self):
         return len(self.noisyImages)

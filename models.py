@@ -103,11 +103,11 @@ class UNet(pl.LightningModule):
                 )
 
     def val_dataloader(self):
-        return DataLoader( GroundTruthDataset(self.data.val_base, self.data.val_noise ),
+        return DataLoader( loadData.GroundTruthDataset(self.data.val_base, self.data.val_noisy ),
                     batch_size=self.data.val_base.shape[0] )
 
     def test_dataloader(self):
-        return DataLoader( GroundTruthDataset(self.data.test_base, self.data.test_noisy ),
+        return DataLoader( loadData.GroundTruthDataset(self.data.test_base, self.data.test_noisy ),
                     batch_size=self.data.test_base.shape[0] )
 
 
