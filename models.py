@@ -34,15 +34,13 @@ class UNet(pl.LightningModule):
         # initializer hyperparameters
         self.hyperparameters = {
             'lr': 1e-3,
-            'batch_size': 10,
-            'max_epochs': 1000,
+            'batch_size': 100,
 
             'dataConstructor': 'groundTruth',
             'Nimages': 10,
             'Mnoisy': 10,
             'Kpairs': 10,
-            'noise_rate': 0.1,
-            'noise_model': loadData.shotRandomNoise
+            'noise_rate': 0.1
         }
         self.hyperparameters.update( hyperparameters )
 
@@ -65,7 +63,10 @@ class UNet(pl.LightningModule):
         images, targets = batch
         reconstruction = self.forward(images)
 
-        return self.pixelLoss(targets, reconstruction)
+        loss = self.pixelLoss(targets, reconstruction)
+        self.log('train_loss', loss.detach(), on_step=True)
+
+        return loss
 
     def validation_step(self, batch, batchidx):
         images, targets = batch
