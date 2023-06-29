@@ -5,6 +5,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 
 from torch.nn.functional import max_pool2d
+from torch.utils.data import DataLoader
 
 
 class UNet(pl.LightningModule):
@@ -36,15 +37,16 @@ class UNet(pl.LightningModule):
             'batch_size': 10,
             'max_epochs': 1000,
 
+            'dataConstructor': 'groundTruth',
             'Nimages': 10,
             'Mnoisy': 10,
+            'Kpairs': 10,
             'noise_rate': 0.1,
             'noise_model': loadData.shotRandomNoise
         }
         self.hyperparameters.update( hyperparameters )
 
         self.pixelLoss = nn.MSELoss()
-
 
     def forward(self, inputs):
         down1 = self.desc32(inputs)
@@ -65,18 +67,47 @@ class UNet(pl.LightningModule):
 
         return self.pixelLoss(targets, reconstruction)
 
+    def validation_step(self, batch, batchidx):
+        images, targets = batch
+        reconstruction = self.forward(images)
+        loss = self.pixelLoss(targets, reconstruction)
+        self.log("val_loss", loss)
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hyperparameters['lr'])
         return optimizer
 
     # data
-    def setup( self, stage=None):
-        self.trainData = loadData.ImageToImageDataset(**self.hyperparameters)
+    def setup( self, stage=None, useData=None):
+        if useData is None:
+            self.data = loadData.NoisyCIFAR( 
+                (self.hyperparameters['Nimages'], self.hyperparameters['Mnoisy']), 
+                (100, 1), self.hyperparameters['noise_rate'])
+        else:
+            self.data = useData
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.trainData, batch_size=self.hyperparameters['batch_size'],
-            shuffle=True)
+        if self.hyperparameters['dataConstructor'] == 'groundTruth':
+            return DataLoader( 
+                loadData.GroundTruthDataset(self.data.train_base, self.data.train_noisy),
+                batch_size=self.hyperparameters['batch_size'], shuffle=True
+                )
 
+        elif self.hyperparameters['dataConstructor'] == 'noiseToNoise':
+            return DataLoader(
+                loadData.NoisyNoisyDataset(self.data.train_noisy, 
+                    self.hyperparameters['Nimages'], self.hyperparameters['Mnoisy'], 
+                    self.hyperparameters['Kpairs']),
+                    batch_size=self.hyperparameters['batch_size'], shuffle=True
+                )
+
+    def val_dataloader(self):
+        return DataLoader( GroundTruthDataset(self.data.val_base, self.data.val_noise ),
+                    batch_size=self.data.val_base.shape[0] )
+
+    def test_dataloader(self):
+        return DataLoader( GroundTruthDataset(self.data.test_base, self.data.test_noisy ),
+                    batch_size=self.data.test_base.shape[0] )
 
 
 
@@ -89,4 +120,29 @@ def convBank(inChannels, outChannels, midChannels=None):
             nn.ReLU(),
             nn.Conv2d(midChannels, outChannels, (3,3), padding='same'), #32
         )
+
+
+
+
+class Control_Mode(object):
+    """ Control for data analysis: simply take the mode of the datapoints """
+    def __init__(self, Mnoisy):
+        self.Mnoisy = Mnoisy
+
+    def reconstruct(self, sortedDataset):
+        reconstructions = []
+        groundTruths = []
+
+        for startInd in range(0, len(sortedDataset), self.Mnoisy):
+            inputs, targets = sortedDataset[ startInd : (startInd+self.Mnoisy) ]
+
+            allInputs = torch.stack( inputs )
+            deNoised, _ = torch.mode(allInputs, dim=0)
+
+            reconstructions.append( deNoised )
+            groundTruths.append( targets[0] )
+
+        return torch.stack(reconstructions), torch.stack(groundTruths)
+
+
 
