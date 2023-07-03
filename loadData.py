@@ -10,6 +10,7 @@ from itertools import permutations
 
 
 
+
 class NoisyCIFAR(object):
     """ object containing small training and validation subsets of CIFAR """
     def __init__(self, trainProfile, valProfile, noise_rate, **_):
@@ -25,14 +26,16 @@ class NoisyCIFAR(object):
         imageInds = np.random.choice( range( len(CIFAR10_data) ), 
                         size=(Nimages_train+Nimages_val), replace=False )
         trainInds = torch.tensor(imageInds[0:Nimages_train]).repeat( Mnoisy_train, 1).permute(1,0).reshape( -1 )
-        valInds = torch.tensor(imageInds[Nimages_train:Nimages_val]).repeat( Mnoisy_val, 1).permute(1,0).reshape( -1 )
+        valInds = torch.tensor(imageInds[Nimages_train:]).repeat( Mnoisy_val, 1).permute(1,0).reshape( -1 )
 
         trainImages = Subset(CIFAR10_data, trainInds)
         valImages = Subset(CIFAR10_data, valInds)
 
+        self.trainInds = trainInds
         self.train_base = next(iter( DataLoader(trainImages, batch_size=len(trainImages)) ))[0]
         self.train_noisy = shotRandomNoise(noise_rate, self.train_base)
 
+        self.valInds = valInds
         self.val_base = next(iter( DataLoader(valImages, batch_size=len(valImages)) ))[0]
         self.val_noisy = shotRandomNoise(noise_rate, self.val_base)
 

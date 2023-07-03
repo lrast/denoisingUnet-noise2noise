@@ -12,6 +12,21 @@ class UNet(pl.LightningModule):
     def __init__(self, **hyperparameters):
         super(UNet, self).__init__()
 
+        # initialize hyperparameters
+        hyperparameterValues = {
+            'lr': 1e-3,
+            'batch_size': 10,
+
+            'dataConstructor': 'groundTruth',
+            'Nimages': 10,
+            'Mnoisy': 10,
+            'Kpairs': 10,
+            'noise_rate': 0.1
+        }
+
+        hyperparameterValues.update( hyperparameters )
+        self.save_hyperparameters( hyperparameterValues )
+
         # initialize the banks of convolutional filters
         self.desc32 = convBank(3, 6)
         self.desc16 = convBank(6, 12)
@@ -31,20 +46,12 @@ class UNet(pl.LightningModule):
 
         self.toOut = nn.Conv2d(6,3, (1,1), padding='same')
 
-        # initializer hyperparameters
-        self.hyperparameters = {
-            'lr': 1e-3,
-            'batch_size': 100,
+        self.outputNlin = nn.Hardsigmoid()
 
-            'dataConstructor': 'groundTruth',
-            'Nimages': 10,
-            'Mnoisy': 10,
-            'Kpairs': 10,
-            'noise_rate': 0.1
-        }
-        self.hyperparameters.update( hyperparameters )
+        # set up loss function
+        self.pixelLoss = nn.L1Loss()
+        self.mse = nn.MSELoss()
 
-        self.pixelLoss = nn.MSELoss()
 
     def forward(self, inputs):
         down1 = self.desc32(inputs)
@@ -56,50 +63,49 @@ class UNet(pl.LightningModule):
         up3 = self.asc8( torch.cat( (down3, self.upConv8(up4)), 1) )
         up2 = self.asc16( torch.cat( (down2, self.upConv16(up3)), 1) )
         up1 = self.asc32( torch.cat( (down1, self.upConv32(up2)), 1) )
-        out = self.toOut( up1 )
+        out = self.outputNlin( self.toOut( up1 ) )
         return out
 
     def training_step(self, batch, batch_ind):
         images, targets = batch
         reconstruction = self.forward(images)
 
-        loss = self.pixelLoss(targets, reconstruction)
-        self.log('train_loss', loss.detach(), on_step=True)
-
+        loss = self.pixelLoss(reconstruction, targets)
+        self.log('train_loss', loss.detach())
         return loss
 
     def validation_step(self, batch, batchidx):
         images, targets = batch
         reconstruction = self.forward(images)
-        loss = self.pixelLoss(targets, reconstruction)
+        loss = self.pixelLoss(reconstruction, targets)
         self.log("val_loss", loss)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hyperparameters['lr'])
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
         return optimizer
 
     # data
     def setup( self, stage=None, useData=None):
         if useData is None:
             self.data = loadData.NoisyCIFAR( 
-                (self.hyperparameters['Nimages'], self.hyperparameters['Mnoisy']), 
-                (100, 1), self.hyperparameters['noise_rate'])
+                (self.hparams.Nimages, self.hparams.Mnoisy), 
+                (100, 1), self.hparams.noise_rate)
         else:
             self.data = useData
 
     def train_dataloader(self):
-        if self.hyperparameters['dataConstructor'] == 'groundTruth':
+        if self.hparams.dataConstructor == 'groundTruth':
             return DataLoader( 
-                loadData.GroundTruthDataset(self.data.train_base, self.data.train_noisy),
-                batch_size=self.hyperparameters['batch_size'], shuffle=True
+                    loadData.GroundTruthDataset(self.data.train_base, self.data.train_noisy),
+                    batch_size=self.hparams.batch_size, shuffle=True
                 )
 
-        elif self.hyperparameters['dataConstructor'] == 'noiseToNoise':
+        elif self.hparams.dataConstructor == 'noiseToNoise':
             return DataLoader(
-                loadData.NoisyNoisyDataset(self.data.train_noisy, 
-                    self.hyperparameters['Nimages'], self.hyperparameters['Mnoisy'], 
-                    self.hyperparameters['Kpairs']),
-                    batch_size=self.hyperparameters['batch_size'], shuffle=True
+                    loadData.NoisyNoisyDataset(self.data.train_noisy, 
+                    self.hparams.Nimages, self.hparams.Mnoisy, 
+                    self.hparams.Kpairs),
+                    batch_size=self.hparams.batch_size, shuffle=True
                 )
 
     def val_dataloader(self):
