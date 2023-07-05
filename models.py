@@ -50,7 +50,6 @@ class UNet(pl.LightningModule):
 
         # set up loss function
         self.pixelLoss = nn.L1Loss()
-        self.mse = nn.MSELoss()
 
 
     def forward(self, inputs):
