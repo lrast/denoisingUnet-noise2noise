@@ -1,8 +1,8 @@
 import torch
 
 
-def MSLoss( reconstruction, targets ):
-    l = torch.nn.MSELoss()
+def L1Loss( reconstruction, targets ):
+    l = torch.nn.L1Loss()
     return l(reconstruction, targets).item()
 
 

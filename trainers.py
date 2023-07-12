@@ -71,7 +71,7 @@ def numbersSweep():
     """ How does reproduction accuracy scale with number of images? """
 
     def initAndTrain():
-        wandb.init( group='groundTruthSweep')
+        wandb.init( group='groundTruthSweep_1')
 
         N = wandb.config.Nimages
         M = wandb.config.Mnoisy
@@ -83,13 +83,13 @@ def numbersSweep():
 
         checkpoint_callback = ModelCheckpoint(dirpath='lightning_logs/'+targetdir, 
             every_n_epochs=1, save_top_k=1, monitor='val_loss')
-        earlystop_callback = EarlyStopping(monitor='val_loss', mode='min', patience=1000)
+        earlystop_callback = EarlyStopping(monitor='val_loss', mode='min', patience=50)
 
         wandb_logger = WandbLogger(project='noiseRemoval', save_dir='wandb/'+targetdir)
 
         trainer = Trainer(logger=wandb_logger,
             log_every_n_steps=1,
-            max_epochs=10000,
+            max_epochs=5000,
             callbacks=[checkpoint_callback, earlystop_callback])
         trainer.fit(model)
 
@@ -103,7 +103,7 @@ def numbersSweep():
         {
             'Nimages': {'values': [10, 20, 50, 100]},
             'Mnoisy': {'values': [10, 20, 50, 100]},
-            'noise_rate': {'values': [0, 0.2, 0.4, 0.6, 0.8, 0.9]},
+            'noise_rate': {'values': [0.2, 0.4, 0.6, 0.8, 0.9]},
             'replicate': {'values': [0,1,2]}
          }
     }

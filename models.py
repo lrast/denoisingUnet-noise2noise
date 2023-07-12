@@ -88,9 +88,10 @@ class UNet(pl.LightningModule):
         if useData is None:
             self.data = loadData.NoisyCIFAR( 
                 (self.hparams.Nimages, self.hparams.Mnoisy), 
-                (100, 1), self.hparams.noise_rate)
+                (500, 1), self.hparams.noise_rate)
         else:
             self.data = useData
+
 
     def train_dataloader(self):
         if self.hparams.dataConstructor == 'groundTruth':
@@ -109,7 +110,7 @@ class UNet(pl.LightningModule):
 
     def val_dataloader(self):
         return DataLoader( loadData.GroundTruthDataset(self.data.val_base, self.data.val_noisy ),
-                    batch_size=self.data.val_base.shape[0] )
+                    batch_size=500)
 
     def test_dataloader(self):
         return DataLoader( loadData.GroundTruthDataset(self.data.test_base, self.data.test_noisy ),
@@ -132,23 +133,12 @@ def convBank(inChannels, outChannels, midChannels=None):
 
 class Control_Mode(object):
     """ Control for data analysis: simply take the mode of the datapoints """
-    def __init__(self, Mnoisy):
-        self.Mnoisy = Mnoisy
+    def __init__(self):
+        pass
 
-    def reconstruct(self, sortedDataset):
-        reconstructions = []
-        groundTruths = []
-
-        for startInd in range(0, len(sortedDataset), self.Mnoisy):
-            inputs, targets = sortedDataset[ startInd : (startInd+self.Mnoisy) ]
-
-            allInputs = torch.stack( inputs )
-            deNoised, _ = torch.mode(allInputs, dim=0)
-
-            reconstructions.append( deNoised )
-            groundTruths.append( targets[0] )
-
-        return torch.stack(reconstructions), torch.stack(groundTruths)
+    def reconstruct(self, noisySamples):
+        deNoised, _ = torch.mode(noisySamples, dim=1)
+        return deNoised
 
 
 

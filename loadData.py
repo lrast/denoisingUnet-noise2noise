@@ -93,7 +93,9 @@ def shotRandomNoise( rate, images ):
     pixelDims = [ images.shape[i] for i in [0,2,3] ]
     noisyPixels = torch.bernoulli( rate * torch.ones( pixelDims ))
 
-    toNoise.permute([0,2,3,1])[ noisyPixels == 1 ] = torch.rand( int(noisyPixels.sum().item()), 3 )
+    pixelCount = toNoise.permute([0,2,3,1])[ noisyPixels == 1. ].shape[0]
+
+    toNoise.permute([0,2,3,1])[ noisyPixels == 1. ] = torch.rand( pixelCount, 3 )
 
     return toNoise
 
