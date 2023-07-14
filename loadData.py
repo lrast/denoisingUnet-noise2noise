@@ -1,14 +1,11 @@
 import torch
-import torchvision
 
 import numpy as np
 
-from torchvision import transforms
+from torchvision import transforms, datasets
 from torch.utils.data import Dataset, Subset, DataLoader
 
 from itertools import permutations
-
-
 
 
 class NoisyCIFAR(object):
@@ -18,31 +15,40 @@ class NoisyCIFAR(object):
         Nimages_train, Mnoisy_train = trainProfile
         Nimages_val, Mnoisy_val = valProfile
 
-        CIFAR10_data = torchvision.datasets.CIFAR10('./CIFAR10', train=True, 
-            transform=transforms.ToTensor())
+        CIFAR10_data = datasets.CIFAR10('./CIFAR10', train=True,
+                                        transform=transforms.ToTensor())
+        CIFAR10_test = datasets.CIFAR10('./CIFAR10', train=False,
+                                        transform=transforms.ToTensor())
 
-        CIFAR10_test = torchvision.datasets.CIFAR10('./CIFAR10', train=False, transform=transforms.ToTensor())
-
-        imageInds = np.random.choice( range( len(CIFAR10_data) ), 
-                        size=(Nimages_train+Nimages_val), replace=False )
-        trainInds = torch.tensor(imageInds[0:Nimages_train]).repeat( Mnoisy_train, 1).permute(1,0).reshape( -1 )
-        valInds = torch.tensor(imageInds[Nimages_train:]).repeat( Mnoisy_val, 1).permute(1,0).reshape( -1 )
+        imageInds = np.random.choice(
+                                range(len(CIFAR10_data)), 
+                                size=(Nimages_train+Nimages_val),
+                                replace=False
+                                )
+        trainInds = torch.tensor(imageInds[0:Nimages_train]
+                                 ).repeat(Mnoisy_train, 1) \
+                                  .permute(1, 0) \
+                                  .reshape(-1)
+        valInds = torch.tensor(imageInds[Nimages_train:]
+                               ).repeat(Mnoisy_val, 1) \
+                                .permute(1, 0) \
+                                .reshape(-1)
 
         trainImages = Subset(CIFAR10_data, trainInds)
         valImages = Subset(CIFAR10_data, valInds)
 
         self.trainInds = trainInds
-        self.train_base = next(iter( DataLoader(trainImages, batch_size=len(trainImages)) ))[0]
+        self.train_base = next(iter(DataLoader(trainImages, 
+                                               batch_size=None)))[0]
         self.train_noisy = shotRandomNoise(noise_rate, self.train_base)
 
         self.valInds = valInds
-        self.val_base = next(iter( DataLoader(valImages, batch_size=len(valImages)) ))[0]
+        self.val_base = next(iter(DataLoader(valImages, batch_size=None)))[0]
         self.val_noisy = shotRandomNoise(noise_rate, self.val_base)
 
-        self.test_base = next( iter( DataLoader(CIFAR10_test, batch_size=500) ))[0]
+        self.test_base = next(iter(DataLoader(CIFAR10_test,
+                                              batch_size=500)))[0]
         self.test_noisy = shotRandomNoise(noise_rate, self.test_base)
-
-
 
 
 # training approaches
@@ -60,20 +66,19 @@ class GroundTruthDataset(Dataset):
         return self.noisyImages[idx], self.noiseFreeImages[idx]
 
 
-
 class NoisyNoisyDataset(Dataset):
     """Dataset of pairs (or more) of corrupted imagese"""
     def __init__(self, noisyImages, Nimages, Mnoisy, Kpairs):
         super(NoisyNoisyDataset, self).__init__()
         self.noisyImages = noisyImages
 
-        allPairs = list( permutations( range(Mnoisy), 2 ) )
-        pairInds = np.random.choice( range(len(allPairs)), Kpairs, replace=False )
+        allPairs = list(permutations(range(Mnoisy), 2))
+        pairInds = np.random.choice(range(len(allPairs)), Kpairs,
+                                    replace=False)
 
         self.IndexPairs = np.array(allPairs)[pairInds]
-        self.ImageIndices = np.concatenate( Nimages*[self.IndexPairs] ) + \
-             np.stack( 2*[Mnoisy*np.array(range(Nimages)).repeat((Kpairs))] ).T
-        print(np.stack( 2*[Mnoisy*np.array(range(Nimages)).repeat((Kpairs))] ))
+        self.ImageIndices = np.concatenate(Nimages*[self.IndexPairs]) + \
+            np.stack(2*[Mnoisy*np.array(range(Nimages)).repeat((Kpairs))]).T
 
     def __len__(self):
         return len(self.noisyImages)
@@ -83,19 +88,17 @@ class NoisyNoisyDataset(Dataset):
         return self.noisyImages[inds[0]], self.noisyImages[inds[1]]
 
 
-
-## Noise production functions
-def shotRandomNoise( rate, images ):
+# Noise production functions
+def shotRandomNoise(rate, images):
     """ totally randomizes random pixels """
-    toNoise = torch.zeros( images.shape )
+    toNoise = torch.zeros(images.shape)
     toNoise.copy_(images)
 
-    pixelDims = [ images.shape[i] for i in [0,2,3] ]
-    noisyPixels = torch.bernoulli( rate * torch.ones( pixelDims ))
+    pixelDims = [images.shape[i] for i in [0, 2, 3]]
+    noisyPixels = torch.bernoulli(rate * torch.ones(pixelDims))
 
-    pixelCount = toNoise.permute([0,2,3,1])[ noisyPixels == 1. ].shape[0]
+    pixelCount = toNoise.permute([0, 2, 3, 1])[noisyPixels == 1.].shape[0]
 
-    toNoise.permute([0,2,3,1])[ noisyPixels == 1. ] = torch.rand( pixelCount, 3 )
+    toNoise.permute([0, 2, 3, 1])[noisyPixels == 1.] = torch.rand(pixelCount, 3)
 
     return toNoise
-

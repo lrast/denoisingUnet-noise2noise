@@ -1,11 +1,11 @@
 import torch
-import loadData
 
 import torch.nn as nn
 import pytorch_lightning as pl
 
 from torch.nn.functional import max_pool2d
 from torch.utils.data import DataLoader
+from loadData import GroundTruthDataset, NoisyNoisyDataset, NoisyCIFAR
 
 
 class UNet(pl.LightningModule):
@@ -24,8 +24,8 @@ class UNet(pl.LightningModule):
             'noise_rate': 0.1
         }
 
-        hyperparameterValues.update( hyperparameters )
-        self.save_hyperparameters( hyperparameterValues )
+        hyperparameterValues.update(hyperparameters)
+        self.save_hyperparameters(hyperparameterValues)
 
         # initialize the banks of convolutional filters
         self.desc32 = convBank(3, 6)
@@ -35,34 +35,33 @@ class UNet(pl.LightningModule):
 
         self.middle = convBank(48, 96)
 
-        self.upConv4 = nn.ConvTranspose2d(96, 48, (2,2), stride=2)
+        self.upConv4 = nn.ConvTranspose2d(96, 48, (2, 2), stride=2)
         self.asc4 = convBank(96, 48)
-        self.upConv8 = nn.ConvTranspose2d(48, 24, (2,2), stride=2)
+        self.upConv8 = nn.ConvTranspose2d(48, 24, (2, 2), stride=2)
         self.asc8 = convBank(48, 24)
-        self.upConv16 = nn.ConvTranspose2d(24, 12, (2,2), stride=2)
+        self.upConv16 = nn.ConvTranspose2d(24, 12, (2, 2), stride=2)
         self.asc16 = convBank(24, 12)
-        self.upConv32 = nn.ConvTranspose2d(12, 6, (2,2), stride=2)
+        self.upConv32 = nn.ConvTranspose2d(12, 6, (2, 2), stride=2)
         self.asc32 = convBank(12, 6)
 
-        self.toOut = nn.Conv2d(6,3, (1,1), padding='same')
+        self.toOut = nn.Conv2d(6, 3, (1, 1), padding='same')
 
         self.outputNlin = nn.Hardsigmoid()
 
         # set up loss function
         self.pixelLoss = nn.L1Loss()
 
-
     def forward(self, inputs):
         down1 = self.desc32(inputs)
-        down2 = self.desc16( max_pool2d(down1, 2) )
-        down3 = self.desc8( max_pool2d(down2, 2) )
-        down4 = self.desc4( max_pool2d(down3, 2) )
-        ubottom = self.middle( max_pool2d(down4, 2) )
-        up4 = self.asc4( torch.cat( (down4, self.upConv4(ubottom)), 1) )
-        up3 = self.asc8( torch.cat( (down3, self.upConv8(up4)), 1) )
-        up2 = self.asc16( torch.cat( (down2, self.upConv16(up3)), 1) )
-        up1 = self.asc32( torch.cat( (down1, self.upConv32(up2)), 1) )
-        out = self.outputNlin( self.toOut( up1 ) )
+        down2 = self.desc16(max_pool2d(down1, 2))
+        down3 = self.desc8(max_pool2d(down2, 2))
+        down4 = self.desc4(max_pool2d(down3, 2))
+        ubottom = self.middle(max_pool2d(down4, 2))
+        up4 = self.asc4(torch.cat((down4, self.upConv4(ubottom)), 1))
+        up3 = self.asc8(torch.cat((down3, self.upConv8(up4)), 1))
+        up2 = self.asc16(torch.cat((down2, self.upConv16(up3)), 1))
+        up1 = self.asc32(torch.cat((down1, self.upConv32(up2)), 1))
+        out = self.outputNlin(self.toOut(up1))
         return out
 
     def training_step(self, batch, batch_ind):
@@ -84,38 +83,43 @@ class UNet(pl.LightningModule):
         return optimizer
 
     # data
-    def setup( self, stage=None, useData=None):
+    def setup(self, stage=None, useData=None):
         if useData is None:
-            self.data = loadData.NoisyCIFAR( 
-                (self.hparams.Nimages, self.hparams.Mnoisy), 
+            self.data = NoisyCIFAR(
+                (self.hparams.Nimages, self.hparams.Mnoisy),
                 (500, 1), self.hparams.noise_rate)
         else:
             self.data = useData
 
-
     def train_dataloader(self):
         if self.hparams.dataConstructor == 'groundTruth':
-            return DataLoader( 
-                    loadData.GroundTruthDataset(self.data.train_base, self.data.train_noisy),
+            return DataLoader(
+                    GroundTruthDataset(
+                        self.data.train_base, 
+                        self.data.train_noisy),
                     batch_size=self.hparams.batch_size, shuffle=True
                 )
 
         elif self.hparams.dataConstructor == 'noiseToNoise':
             return DataLoader(
-                    loadData.NoisyNoisyDataset(self.data.train_noisy, 
-                    self.hparams.Nimages, self.hparams.Mnoisy, 
-                    self.hparams.Kpairs),
+                    NoisyNoisyDataset(
+                        self.data.train_noisy, 
+                        self.hparams.Nimages, self.hparams.Mnoisy, 
+                        self.hparams.Kpairs),
                     batch_size=self.hparams.batch_size, shuffle=True
                 )
 
     def val_dataloader(self):
-        return DataLoader( loadData.GroundTruthDataset(self.data.val_base, self.data.val_noisy ),
-                    batch_size=500)
+        return DataLoader(
+                GroundTruthDataset(self.data.val_base, self.data.val_noisy),
+                batch_size=500
+                )
 
     def test_dataloader(self):
-        return DataLoader( loadData.GroundTruthDataset(self.data.test_base, self.data.test_noisy ),
-                    batch_size=self.data.test_base.shape[0] )
-
+        return DataLoader(
+                GroundTruthDataset(self.data.test_base, self.data.test_noisy),
+                batch_size=self.data.test_base.shape[0]
+                )
 
 
 def convBank(inChannels, outChannels, midChannels=None):
@@ -123,12 +127,10 @@ def convBank(inChannels, outChannels, midChannels=None):
         midChannels = outChannels
 
     return nn.Sequential(
-            nn.Conv2d(inChannels, midChannels, (3,3), padding='same'), #32
+            nn.Conv2d(inChannels, midChannels, (3, 3), padding='same'),  # 32
             nn.ReLU(),
-            nn.Conv2d(midChannels, outChannels, (3,3), padding='same'), #32
+            nn.Conv2d(midChannels, outChannels, (3, 3), padding='same'),  # 32
         )
-
-
 
 
 class Control_Mode(object):
@@ -139,6 +141,3 @@ class Control_Mode(object):
     def reconstruct(self, noisySamples):
         deNoised, _ = torch.mode(noisySamples, dim=1)
         return deNoised
-
-
-
