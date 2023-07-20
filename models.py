@@ -141,3 +141,35 @@ class Control_Mode(object):
     def reconstruct(self, noisySamples):
         deNoised, _ = torch.mode(noisySamples, dim=1)
         return deNoised
+
+
+class ImageSequenceTransformer(pl.LightningModule):
+    """Transformers taking a sequence of iamges as input """
+    def __init__(self):
+        super(ImageSequenceTransformer, self).__init__()
+        
+        self.network = nn.Transformer(d_model=32*32*3, batch_first=True)
+        self.loss = nn.L1Loss()
+
+        self.save_hyperparameters({'lr': 1e-3})
+
+    def training_step(self, batch, batch_ind):
+        inputs, targets = batch
+        reconstructions = self.forward(inputs)
+        return self.loss(targets, reconstructions)
+
+    def forward(self, x):
+        x = x.view(x.shape[0], x.shape[1], 3*32*32)
+        output = self.network.forward(x, torch.zeros(x.shape[0], 1, 32*32*3))
+        return output.view(x.shape[0], 3, 32, 32)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        return optimizer
+
+
+
+
+
+
+

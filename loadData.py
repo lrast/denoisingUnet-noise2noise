@@ -5,7 +5,7 @@ import numpy as np
 from torchvision import transforms, datasets
 from torch.utils.data import Dataset, Subset, DataLoader
 
-from itertools import permutations
+from itertools import permutations, combinations
 
 
 class NoisyCIFAR(object):
@@ -39,11 +39,12 @@ class NoisyCIFAR(object):
 
         self.trainInds = trainInds
         self.train_base = next(iter(DataLoader(trainImages, 
-                                               batch_size=None)))[0]
+                                               batch_size=len(trainInds))))[0]
         self.train_noisy = shotRandomNoise(noise_rate, self.train_base)
 
         self.valInds = valInds
-        self.val_base = next(iter(DataLoader(valImages, batch_size=None)))[0]
+        self.val_base = next(iter(DataLoader(valImages, 
+                                             batch_size=len(valInds))))[0]
         self.val_noisy = shotRandomNoise(noise_rate, self.val_base)
 
         self.test_base = next(iter(DataLoader(CIFAR10_test,
@@ -86,6 +87,43 @@ class NoisyNoisyDataset(Dataset):
     def __getitem__(self, idx):
         inds = self.ImageIndices[idx]
         return self.noisyImages[inds[0]], self.noisyImages[inds[1]]
+
+
+class SequenceDataset(object):
+    """ Dataset of image sequences """
+    def __init__(self, baseImages, noisyImages, Nimages, Mnoisy, 
+                 seqLength=1, noisyOutput=True, seqTypes=permutations):
+        super(SequenceDataset, self).__init__()
+
+        self.Nimages = Nimages
+        self.noisyOutput = noisyOutput
+        self.seqLength = seqLength
+
+        self.noisyImages = noisyImages.reshape(Nimages, Mnoisy, 3, 32, 32)
+        self.baseImages = baseImages.reshape(Nimages, Mnoisy, 3,
+                                             32, 32)[:, 0, :, :, :]
+
+        self.possibleInds = list(seqTypes(range(Mnoisy), 
+                                          seqLength+int(noisyOutput)))
+
+    def __len__(self):
+        return self.Nimages * len(self.possibleInds)
+
+    def __getitem__(self, idx):
+        seqsPerImage = len(self.possibleInds)
+        imgNum = int(idx / seqsPerImage)
+        seqInd = idx % seqsPerImage
+
+        if self.noisyOutput:
+            return ( 
+                self.noisyImages[imgNum, self.possibleInds[seqInd][:-1], :, :, :],
+                self.noisyImages[imgNum, self.possibleInds[seqInd][-1], :, :, :]
+                )
+        else:
+            return (
+                self.noisyImages[imgNum, self.possibleInds[seqInd], :, :, :],
+                self.baseImages[imgNum]
+                )
 
 
 # Noise production functions
