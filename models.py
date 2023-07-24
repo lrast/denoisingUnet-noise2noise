@@ -148,7 +148,11 @@ class ImageSequenceTransformer(pl.LightningModule):
     def __init__(self):
         super(ImageSequenceTransformer, self).__init__()
         
-        self.network = nn.Transformer(d_model=32*32*3, batch_first=True)
+        self.network = nn.Sequential(
+                nn.Linear(3*32*32, 512),
+                nn.Transformer(d_model=512, batch_first=True)
+            )
+
         self.loss = nn.L1Loss()
 
         self.save_hyperparameters({'lr': 1e-3})
