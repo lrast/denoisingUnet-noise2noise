@@ -1,11 +1,12 @@
 import torch
-
-import torch.nn as nn
 import pytorch_lightning as pl
+import torch.nn as nn
 
 from torch.nn.functional import max_pool2d
 from torch.utils.data import DataLoader
-from .loadData import GroundTruthDataset, NoisyNoisyDataset, NoisyCIFAR
+
+from noiseRemoval.loadData import GroundTruthDataset, \
+                                  NoisyNoisyDataset, NoisyCIFAR
 
 
 class UNet(pl.LightningModule):
@@ -148,10 +149,12 @@ class ImageSequenceTransformer(pl.LightningModule):
     def __init__(self):
         super(ImageSequenceTransformer, self).__init__()
         
-        self.network = nn.Sequential(
-                nn.Linear(3*32*32, 512),
-                nn.Transformer(d_model=512, batch_first=True)
-            )
+        self.latentDims = 512
+
+        self.encoder = nn.Linear(3*32*32, self.latentDims)
+        self.transformer = nn.Transformer(d_model=self.latentDims,
+                                          batch_first=True)
+        self.decoder = nn.Linear(self.latentDims, 3*32*32)
 
         self.loss = nn.L1Loss()
 
@@ -163,13 +166,17 @@ class ImageSequenceTransformer(pl.LightningModule):
         return self.loss(targets, reconstructions)
 
     def forward(self, x):
+        print(x.shape)
         x = x.view(x.shape[0], x.shape[1], 3*32*32)
-        output = self.network.forward(x, torch.zeros(x.shape[0], 1, 32*32*3))
+        encodedx = self.encoder(x)
+        transformed = self.transformer.forward(
+                                    encodedx,
+                                    torch.zeros(x.shape[0], 1, self.latentDims)
+                                )
+        output = self.decoder(transformed)
+
         return output.view(x.shape[0], 3, 32, 32)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
         return optimizer
-
-
-
