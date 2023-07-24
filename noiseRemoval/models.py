@@ -166,7 +166,6 @@ class ImageSequenceTransformer(pl.LightningModule):
         return self.loss(targets, reconstructions)
 
     def forward(self, x):
-        print(x.shape)
         x = x.view(x.shape[0], x.shape[1], 3*32*32)
         encodedx = self.encoder(x)
         transformed = self.transformer.forward(
