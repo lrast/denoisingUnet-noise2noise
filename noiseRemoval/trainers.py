@@ -2,7 +2,7 @@ import torch
 import wandb
 import shutil
 
-from noiseRemoval.models import UNet
+from .models import UNet
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger

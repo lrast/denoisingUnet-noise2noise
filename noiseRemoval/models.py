@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.nn.functional import max_pool2d
 from torch.utils.data import DataLoader
 
-from noiseRemoval.loadData import GroundTruthDataset, \
+from .loadData import GroundTruthDataset, \
                                   NoisyNoisyDataset, NoisyCIFAR
 
 
